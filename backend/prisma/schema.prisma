@@ -1,0 +1,97 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String             @id @default(uuid()) @db.Uuid
+  email            String             @unique
+  passwordHash     String             @map("password_hash")
+  name             String
+  refreshToken     String?            @map("refresh_token") @db.Text
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  interviews       Interview[]
+  codingSubmissions CodingSubmission[]
+
+  @@map("users")
+}
+
+enum InterviewStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model Interview {
+  id                 String          @id @default(uuid()) @db.Uuid
+  userId             String          @map("user_id") @db.Uuid
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role               String
+  difficulty         String
+  type               String
+  status             InterviewStatus @default(ACTIVE)
+  overallScore       Float?          @map("overall_score")
+  technicalScore     Float?          @map("technical_score")
+  communicationScore Float?          @map("communication_score")
+  feedback           String?         @db.Text
+  strengths          String[]
+  weaknesses         String[]
+  suggestions        String[]
+  questions          Question[]
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  // Indexing foreign key to speed up user dashboard and history queries
+  @@index([userId])
+  @@map("interviews")
+}
+
+model Question {
+  id          String    @id @default(uuid()) @db.Uuid
+  interviewId String    @map("interview_id") @db.Uuid
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questionText String    @map("question_text") @db.Text
+  order       Int
+  answer      Answer?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Indexing foreign key to speed up chat log compilation queries
+  @@index([interviewId])
+  @@map("questions")
+}
+
+model Answer {
+  id                 String   @id @default(uuid()) @db.Uuid
+  questionId         String   @unique @map("question_id") @db.Uuid
+  question           Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerText         String   @map("answer_text") @db.Text
+  feedbackText       String?  @map("feedback_text") @db.Text
+  score              Float?
+  technicalScore     Float?   @map("technical_score")
+  communicationScore Float?   @map("communication_score")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  // questionId has a unique index automatically created due to @unique constraint
+  @@map("answers")
+}
+
+model CodingSubmission {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language      String
+  code          String   @db.Text
+  status        String
+  stdout        String?  @db.Text
+  stderr        String?  @db.Text
+  compileOutput String?  @map("compile_output") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Indexing foreign key to speed up user coding sandboxes audits
+  @@index([userId])
+  @@map("coding_submissions")
+}
